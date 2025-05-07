@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Zelf Cirkels Trainen!</title>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+        <!-- -->
+    </head>
+    <body>
+        <h1>CIRCLE IDENTIFIER</h1>
+
+        <!-- Upload een afbeelding -->
+        <input type="file" id="imageUpload" accept="image/*" onchange="handleImage(this)" />
+        <br /><br />
+
+        <!-- Canvas om geüploade afbeelding te tonen -->
+        <canvas id="uploadCanvas" width="400" height="400" style="border: 4px solid black"></canvas><br /><br />
+
+        <!-- Knoppen -->
+        <button onclick="labelUploadAsCircle()">Label upload als Cirkel</button>
+        <button onclick="labelUploadAsNotCircle()">Label upload als GEEN Cirkel</button><br /><br />
+        <button onclick="trainModel()">Train Model</button><br /><br />
+        <button onclick="predict()">Voorspel</button>
+
+        <h2 id="resultaat"></h2>
+        <h3 id="datasetInfo">Aantal cirkels: 0 | Aantal geen-cirkels: 0</h3>
+
+        <script>
+            // --- GLOBALE VARIABELEN ---
+            let model;
+            let xs = []; // Trainingsafbeeldingen
+            let ys = []; // Labels
+            let inputTensor; // Tensor van de afbeelding
+            let circles = 0;
+            let notCircles = 0;
+            let uploadedImage = null; // Originele geüploade afbeelding
+
+            // --- FUNCTIES ---
+
+            // Functie om afbeelding aan canvas aan te passen
+            function adjustCanvas() {
+                if (!uploadedImage) {
+                    alert("Geen afbeelding om aan te passen!");
+                    return;
+                }
+                const canvas = document.getElementById("uploadCanvas");
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
+            }
+
+            // Functie om afbeelding te laden en op canvas te tekenen
+            function handleImage(input) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const img = new Image();
+                    img.onload = function () {
+                        const canvas = document.getElementById("uploadCanvas");
+                        const ctx = canvas.getContext("2d");
+
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        // Schaal de afbeelding naar canvas grootte
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height); // Groot tekenen
+
+                        uploadedImage = img; // Originele afbeelding opslaan
+
+                        // inputTensor maken vanuit canvas (niet van img rechtstreeks)
+                        inputTensor = createInputTensorFromCanvas(canvas);
+
+                        console.log("Afbeelding geladen en klaar voor labeling");
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // Functie om van canvas een tensor te maken
+            function createInputTensorFromCanvas(sourceCanvas) {
+                const smallCanvas = document.createElement("canvas");
+                smallCanvas.width = 32;
+                smallCanvas.height = 32;
+                const smallCtx = smallCanvas.getContext("2d");
+                smallCtx.drawImage(sourceCanvas, 0, 0, 32, 32);
+
+                const imageData = smallCtx.getImageData(0, 0, 32, 32);
+                const data = imageData.data;
+                const grayData = [];
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = (data[i] + data[i + 1] + data[i + 2]) / 3 / 255;
+                    grayData.push(gray);
+                }
+
+                return tf.tensor4d(grayData, [1, 32, 32, 1]);
+            }
+
+            // Functie om upload labeling op te slaan
+            function saveUploadDrawing(label) {
+                if (!inputTensor) {
+                    alert("Upload eerst een afbeelding!");
+                    return;
+                }
+                xs.push(inputTensor);
+                ys.push(label);
+                updateCounters(label);
+                alert(`Upload opgeslagen als ${label === 1 ? "CIRKEL" : "GEEN CIRKEL"}`);
+            }
+
+            function labelUploadAsCircle() {
+                saveUploadDrawing(1);
+            }
+
+            function labelUploadAsNotCircle() {
+                saveUploadDrawing(0);
+            }
+
+            // Functie om counters bij te werken
+            function updateCounters(label) {
+                if (label === 1) {
+                    circles++;
+                } else {
+                    notCircles++;
+                }
+                document.getElementById(
+                    "datasetInfo"
+                ).innerText = `Aantal cirkels: ${circles} | Aantal geen-cirkels: ${notCircles}`;
+            }
+
+            // FUNCTIE OM MDOEL TE TRAINEN: DE MAGIE VAN MACHINE LEARNING (TENSORFLOW)
+            // https://www.w3schools.com/ai/ai_tensorflow_intro.asp
+            
+            async function trainModel() {
+                // Check of er genoeg trainingsvoorbeelden zijn (minimaal 1 cirkel en 1 geen-cirkel)
+                if (xs.length < 2) {
+                    alert("Je moet minstens 1 cirkel en 1 geen-cirkel labelen!");
+                    return;
+                }
+
+                // Trainingsdata voorbereiden
+                const X = tf.concat(xs); // Alle input-tensors samenvoegen tot één grote tensor
+                const Y = tf.tensor2d(ys, [ys.length, 1]); // Labels (1 of 0) omzetten naar 2D-tensor
+
+                // Nieuw sequentieel model aanmaken (lagen worden achter elkaar gestapeld)
+                model = tf.sequential();
+
+                // Eerste laag: Conv2D-laag die leert zoeken naar patronen (zoals randen of rondingen)
+                model.add(
+                    tf.layers.conv2d({
+                        inputShape: [32, 32, 1], // Input-afbeelding formaat: 32x32 pixels, 1 kleurkanaal (grijswaarden)
+                        filters: 8, // Aantal filters (wat het model kan leren herkennen)
+                        kernelSize: 3, // Grootte van het filter (3x3 pixels)
+                        activation: "relu", // Activation function: houdt alleen positieve signalen over
+                    })
+                );
+
+                // Pooling-laag: verkleint de afbeelding en behoudt de belangrijkste kenmerken
+                model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+
+                // Flatten-laag: maakt van de 2D-data een platte 1D-vector om naar een dense-laag te sturen
+                model.add(tf.layers.flatten());
+
+                // Volledig verbonden Dense-laag: output 1 getal (de kans dat het een cirkel is)
+                model.add(
+                    tf.layers.dense({
+                        units: 1, // Slechts 1 output: cirkel (1) of geen cirkel (0)
+                        activation: "sigmoid", // Sigmoid maakt de output tussen 0 en 1
+                    })
+                );
+
+                // Model compileren: optimizer en loss-functie instellen voor de training
+                model.compile({
+                    optimizer: "adam", // Adam optimizer: slim aanpassen van gewichten
+                    loss: "binaryCrossentropy", // Loss-functie geschikt voor binaire classificatie
+                    metrics: ["accuracy"], // Bijhouden hoe vaak de voorspelling correct is
+                });
+
+                // Model trainen op de data
+                await model.fit(X, Y, {
+                    epochs: 20, // 20 keer alle data doorlopen
+                    batchSize: 5, // Steeds 5 voorbeelden tegelijk gebruiken om te leren
+                    callbacks: {
+                        onEpochEnd: (epoch, logs) => {
+                            console.log(`Epoch ${epoch}: verlies=${logs.loss}`); // Na elke epoch verlies loggen
+                        },
+                    },
+                });
+
+                // Na de training gebruiker waarschuwen dat het model klaar is
+                alert("Model is getraind met jouw data!");
+            }
+
+            // Functie om voorspelling te doen
+            async function predict() {
+                if (!model) {
+                    alert("Train eerst het model!");
+                    return;
+                }
+                if (!inputTensor) {
+                    alert("Upload eerst een afbeelding!");
+                    return;
+                }
+
+                const prediction = model.predict(inputTensor);
+                prediction.print();
+
+                const waarde = (await prediction.data())[0];
+                const resultaat = waarde > 0.5 ? "CIRKEL!" : "GEEN CIRKEL!";
+                document.getElementById("resultaat").innerText = resultaat;
+            }
+        </script>
+    </body>
+</html>
