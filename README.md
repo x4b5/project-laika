@@ -45,16 +45,22 @@ Focus areas:
 
 Focus areas:
 - **Deploy AI models** in real-world environments using cloud platforms and web technologies.
+- **Explore the integration of AI in web development** by building interactive front-end applications that leverage AI capabilities such as prediction, personalization, recommendation, and natural language interaction.
+Use AI tools to support and enhance the development process itself, such as AI-assisted coding, design generation, and optimization.
+
+Embed AI functionality into web applications, enabling dynamic, intelligent user experiences through features like prediction, personalization, natural language interaction, and smart automation.
+
+
 
 ### 4. Professional Goals: Build a visible and credible AI profile.
 
-Focus areas:
+Focus Area
 - **Create a professional project portfolio** to showcase practical expertise.
 - **Produce clear, structured project documentation** for each phase.
 - **Develop the ability to explain AI concepts** clearly to non-technical audiences.
+- **Advise end-users on the responsible and effective application of AI.**
+- **Develop skills in prompt engineering** to optimize interactions with AI language models.
 - **Position myself as a (practical) AI expert** ready for real-world applications.
-
-### 5. Language Goals: Improve professional English communication.
 
 Focus areas:
 - **Optimize English writing and speaking skills** for technical documentation, presentations, and communication within the global tech industry.
